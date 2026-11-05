@@ -35,9 +35,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # GitHub-hosted Ubuntu runners already include the Android SDK.
-      # Avoid android-actions/setup-android here: it is failing while
-      # trying to install the obsolete SDK package named "tools".
       - name: Locate preinstalled Android SDK
         shell: bash
         run: |
@@ -50,17 +47,47 @@ jobs:
             exit 1
           fi
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
-          echo "Using $SDKMANAGER"
 
       - name: Accept Android SDK licenses
         shell: bash
-        run: |
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+        run: yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
 
       - name: Install Android SDK components
         shell: bash
+        run: "$SDKMANAGER" --sdk_root="$ANDROID_HOME" 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Align Java and Kotlin JVM targets
+        shell: bash
+        working-directory: source/RemoteLink
         run: |
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" 'platforms;android-35' 'build-tools;35.0.0'
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.remotelink.app"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.remotelink.app"
+                  minSdk = 26
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "0.1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOF
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
